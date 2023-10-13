@@ -1,10 +1,14 @@
 
+import { ExcelTable} from "./components"
+
 
 function App() {
 
   return (
     <>
-     <h1>salam</h1>
+   
+    <ExcelTable/>
+   
     </>
   )
 }
