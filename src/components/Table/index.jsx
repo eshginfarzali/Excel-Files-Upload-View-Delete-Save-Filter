@@ -6,8 +6,6 @@ import {
   Input,
   Space,
   Alert,
-  Modal,
-  Select,
 } from "antd";
 import {
   UploadOutlined,
@@ -17,8 +15,7 @@ import {
 } from "@ant-design/icons";
 import Highlighter from "react-highlight-words";
 import * as XLSX from "xlsx";
-
-const { Option } = Select;
+import { AddEditModal } from "../Modal";
 
 export const ExcelTable = () => {
   const [excelData, setExcelData] = useState([]);
@@ -28,7 +25,6 @@ export const ExcelTable = () => {
   const [editingKey, setEditingKey] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [modalData, setModalData] = useState(null);
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [formData, setFormData] = useState({ len: "", status: "" });
 
   const [excelFile, setExcelFile] = useState(null);
@@ -43,7 +39,7 @@ export const ExcelTable = () => {
     let fileTypes = [
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text/csv",
+      "text.csv",
     ];
     let selectedFile = e.fileList[0]?.originFileObj;
 
@@ -70,7 +66,17 @@ export const ExcelTable = () => {
     const worksheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[worksheetName];
     const data = XLSX.utils.sheet_to_json(worksheet);
-    setExcelData(data);
+
+    // Mevcut en büyük id'yi bulun
+    const maxId = Math.max(...excelData.map(item => item.id), 0);
+
+    // Yeni veriyi eklerken id'yi ayarlayın
+    const newData = data.map((item, index) => ({
+      ...item,
+      id: maxId + 1 + index
+    }));
+  
+    setExcelData(newData);
   };
 
   const handleSearch = (selectedKeys, confirm, dataIndex) => {
@@ -83,7 +89,7 @@ export const ExcelTable = () => {
     clearFilters();
     setSearchText("");
   };
-
+  
   const getColumnSearchProps = (dataIndex) => ({
     filterDropdown: ({
       setSelectedKeys,
@@ -151,29 +157,45 @@ export const ExcelTable = () => {
       ? Object.keys(excelData[0]).map((key) => ({
           title: key,
           dataIndex: key,
-          key: key, // You can remove this line if you don't want to show the 'key' in the table
+          key: key,
           width: "20%",
           ...getColumnSearchProps(key),
           sorter: (a, b) => (a[key] > b[key] ? 1 : -1),
         }))
       : [];
 
-  const handleSave = () => {
-    const newData = [...excelData];
-    const index = newData.findIndex((item) => modalData.id === item.id);
-    newData[index] = modalData;
-    setExcelData(newData);
-    setIsModalVisible(false);
-  };
+// ...
+const generateUniqueId = (data) => {
+  const maxId = Math.max(...data.map(item => item.id), 0);
+  return maxId + 1;
+};
+
+let modalDataCopy = modalData;
+
+const handleSave = () => {
+  const newData = [...excelData];
+  if (modalDataCopy === null) {
+    // If modalDataCopy is null, it means new data is being added.
+    // Generate a new unique ID for the new data.
+    const newId = generateUniqueId(newData);
+    modalDataCopy = { id: newId, len: formData.len, status: formData.status };
+    newData.push(modalDataCopy);
+  } else {
+    // If modalDataCopy is not null, an existing data is being updated.
+    const index = newData.findIndex((item) => modalDataCopy.id === item.id);
+    newData[index] = modalDataCopy;
+  }
+  setExcelData(newData);
+  setIsModalVisible(false);
+};
+
+
+
+
 
   const showAddModal = () => {
-    setIsAddModalVisible(true);
-  };
-
-  const handleAddData = () => {
-    const newId = Math.max(...excelData.map((item) => item.id)) + 1;
-    setExcelData([...excelData, { id: newId, ...formData }]);
-    setIsAddModalVisible(false);
+    setIsModalVisible(true);
+    setModalData(null);
   };
 
   return (
@@ -187,11 +209,13 @@ export const ExcelTable = () => {
         onChange={handleFile}
         showUploadList={false}
       >
-        <Button icon={<UploadOutlined />}>Load Excel File</Button>
+        <Button icon={<UploadOutlined/>}>Load Excel File</Button>
       </Upload>
-      <Button type="primary" onClick={showAddModal}>
-        Add New Data
-      </Button>
+      {excelData.length > 0 && (
+        <Button type="primary" onClick={showAddModal}>
+          Add New Data
+        </Button>
+      )}
       <Table
         columns={[
           ...columns,
@@ -228,14 +252,14 @@ export const ExcelTable = () => {
                           setIsModalVisible(true);
                         }}
                       >
-                        Edit
+                      
                       </Button>
                       <Button
                         type="default"
                         icon={<DeleteOutlined />}
                         onClick={() => handleDelete(record)}
                       >
-                        Delete
+                  
                       </Button>
                     </Space>
                   )}
@@ -244,71 +268,19 @@ export const ExcelTable = () => {
             },
           },
         ]}
-        dataSource={excelData}
+        dataSource={excelData.map((item) => ({ ...item, key: item.id }))}
         pagination={true}
       />
-      <Modal
-        title="Edit Row"
-        visible={isModalVisible}
-        onOk={handleSave}
-        onCancel={() => setIsModalVisible(false)}
-      >
-        {modalData &&
-          Object.keys(modalData)
-            .filter((key) => key !== "id") // Exclude the 'id' field
-            .map((key) => (
-              <div key={key}>
-                <label>
-                  {key}: <br />
-                </label>
-                {key === "status" ? (
-                  <Select
-                    style={{ width: 90 }}
-                    value={modalData[key]}
-                    onChange={(value) =>
-                      setModalData({ ...modalData, [key]: value })
-                    }
-                  >
-                    <Option value="0">0</Option>
-                    <Option value="1">1</Option>
-                    <Option value="2">2</Option>
-                  </Select>
-                ) : (
-                  <Input
-                    value={modalData[key]}
-                    onChange={(e) =>
-                      setModalData({ ...modalData, [key]: e.target.value })
-                    }
-                  />
-                )}
-              </div>
-            ))}
-      </Modal>
-      <Modal
-        title="Add New Data"
-        visible={isAddModalVisible}
-        onOk={handleAddData}
-        onCancel={() => setIsAddModalVisible(false)}
-      >
-        <div>
-          <label>len:</label>
-          <Input
-            value={formData.len}
-            onChange={(e) => setFormData({ ...formData, len: e.target.value })}
-          />
-        </div>
-        <div>
-          <label>status:</label>
-          <Select
-            value={formData.status}
-            onChange={(value) => setFormData({ ...formData, status: value })}
-          >
-            <Option value="0">0</Option>
-            <Option value="1">1</Option>
-            <Option value="2">2</Option>
-          </Select>
-        </div>
-      </Modal>
+
+      <AddEditModal
+        isModalVisible={isModalVisible}
+        handleSave={handleSave}
+        handleCancel={() => setIsModalVisible(false)}
+        modalData={modalData}
+        setModalData={setModalData}
+        formData={formData}
+        setFormData={setFormData}
+      />
     </div>
   );
 };

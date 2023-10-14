@@ -1,38 +1,51 @@
-
+/*eslint-disable*/
 import { Modal, Input, Select } from "antd";
 
 const { Option } = Select;
 
-
 export const AddEditModal = ({
   isModalVisible,
-  handleAddEditData,
-  setModalVisible,
+  handleSave,
+  handleCancel,
+  modalData,
+  setModalData,
   formData,
   setFormData,
-  isEditing, 
-}) =>{
-  const title = isEditing ? "Edit Data" : "Add New Data";
-
+}) => {
   return (
     <Modal
-      title={title}
+      title={modalData ? "Edit Row" : "Add New Data"}
       visible={isModalVisible}
-      onOk={handleAddEditData}
-      onCancel={() => setModalVisible(false)}
+      onOk={handleSave}
+      onCancel={handleCancel}
     >
       <div>
         <label>len:</label>
         <Input
-          value={formData.len}
-          onChange={(e) => setFormData({ ...formData, len: e.target.value })}
-        />
+  value={modalData ? modalData.len : formData.len}
+  onChange={(e) => {
+    if (modalData) {
+      setModalData({ ...modalData, len: e.target.value });
+    } else {
+      setFormData({ ...formData, len: e.target.value });
+    }
+  }}
+/>
+
       </div>
+      <br />
       <div>
         <label>status:</label>
         <Select
-          value={formData.status}
-          onChange={(value) => setFormData({ ...formData, status: value })}
+          style={{ width: 90 }}
+          value={modalData ? modalData.status : formData.status}
+          onChange={(value) => {
+            if (modalData) {
+              setModalData({ ...modalData, status: value });
+            } else {
+              setFormData({ ...formData, status: value });
+            }
+          }}
         >
           <Option value="0">0</Option>
           <Option value="1">1</Option>
@@ -41,6 +54,4 @@ export const AddEditModal = ({
       </div>
     </Modal>
   );
-}
-
-
+};
