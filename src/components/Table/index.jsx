@@ -1,21 +1,20 @@
 import { useState, useRef } from "react";
-import {
-  Upload,
-  Button,
-  Table,
-  Input,
-  Space,
-  Alert,
-} from "antd";
+import { Upload, Button, Table, Input, Space, Alert } from "antd";
 import {
   UploadOutlined,
   SearchOutlined,
   EditOutlined,
   DeleteOutlined,
+  EnvironmentOutlined,
+  PieChartOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 import Highlighter from "react-highlight-words";
 import * as XLSX from "xlsx";
+import faker from 'faker';
 import { AddEditModal } from "../Modal";
+import { BarChart, PieChart } from "../Chart";
+
 
 export const ExcelTable = () => {
   const [excelData, setExcelData] = useState([]);
@@ -26,9 +25,10 @@ export const ExcelTable = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [modalData, setModalData] = useState(null);
   const [formData, setFormData] = useState({ len: "", status: "" });
-
   const [excelFile, setExcelFile] = useState(null);
   const [typeError, setTypeError] = useState(null);
+  const [pieChartData, setPieChartData] = useState(null);
+  const [barChartData, setBarChartData] = useState(null);
 
   const handleDelete = (record) => {
     const updatedData = excelData.filter((item) => item.id !== record.id);
@@ -39,7 +39,7 @@ export const ExcelTable = () => {
     let fileTypes = [
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text.csv",
+      "text/csv",
     ];
     let selectedFile = e.fileList[0]?.originFileObj;
 
@@ -53,11 +53,11 @@ export const ExcelTable = () => {
           handleFileSubmit(e.target.result);
         };
       } else {
-        setTypeError("Please select only excel file types");
+        setTypeError("Please select Excel file types only.");
         setExcelFile(null);
       }
     } else {
-      setTypeError("Please select your file");
+      setTypeError("Select your file.");
     }
   };
 
@@ -67,14 +67,13 @@ export const ExcelTable = () => {
     const worksheet = workbook.Sheets[worksheetName];
     const data = XLSX.utils.sheet_to_json(worksheet);
 
- 
-    const maxId = Math.max(...excelData.map(item => item.id), 0);
+    const maxId = Math.max(...excelData.map((item) => item.id), 0);
 
     const newData = data.map((item, index) => ({
       ...item,
-      id: maxId + 1 + index
+      id: maxId + 1 + index,
     }));
-  
+
     setExcelData(newData);
   };
 
@@ -88,7 +87,7 @@ export const ExcelTable = () => {
     clearFilters();
     setSearchText("");
   };
-  
+
   const getColumnSearchProps = (dataIndex) => ({
     filterDropdown: ({
       setSelectedKeys,
@@ -163,32 +162,82 @@ export const ExcelTable = () => {
         }))
       : [];
 
+  const showPieChart = () => {
+    const status0LenTotal = excelData.reduce(
+      (total, item) => (item.status === 0 ? total + item.len : total),
+      0
+    );
+    const status1LenTotal = excelData.reduce(
+      (total, item) => (item.status === 1 ? total + item.len : total),
+      0
+    );
+    const status2LenTotal = excelData.reduce(
+      (total, item) => (item.status === 2 ? total + item.len : total),
+      0
+    );
 
-const generateUniqueId = (data) => {
-  const maxId = Math.max(...data.map(item => item.id), 0);
-  return maxId + 1;
-};
+   
+    const pieChartData = {
+      labels: ["Status 0", "Status 1", "Status 2"],
+      label: '# of Votes',
+      datasets: [
+        {
+          label: "Len Cemi",
+          data: [status0LenTotal, status1LenTotal, status2LenTotal],
+          backgroundColor: ["#FF5733", "#33FF57", "#3366FF"],
+        },
+      ],
+    };
+    setPieChartData(pieChartData);
+  };
 
-let modalDataCopy = modalData;
+  const showBarChart = () => {
+    const status0Count = excelData.filter((item) => item.status === 0).length;
+    const status1Count = excelData.filter((item) => item.status === 1).length;
+    const status2Count = excelData.filter((item) => item.status === 2).length;
 
-const handleSave = () => {
-  const newData = [...excelData];
-  if (modalDataCopy === null) {
-  
-    const newId = generateUniqueId(newData);
-    modalDataCopy = { id: newId, len: formData.len, status: formData.status };
-    newData.push(modalDataCopy);
-  } else {
-    const index = newData.findIndex((item) => modalDataCopy.id === item.id);
-    newData[index] = modalDataCopy;
-  }
-  setExcelData(newData);
-  setIsModalVisible(false);
-};
+    const barChartData = {
+      datasets: [
+        {
+          label: 'Satus 0',
+          data: status0Count,
+          backgroundColor: 'rgb(218, 31, 31)',
+        },
+        {
+          label: 'Satus 1',
+          data: status1Count,
+          backgroundColor: 'rgb(51, 211, 23)',
+        },
+        {
+          label: 'Satus 2',
+          data: status2Count,
+          backgroundColor: 'rgb(53, 162, 235)',
+        },
+      ],
+    }
+    setBarChartData(barChartData)
+  };
 
+  const generateUniqueId = (data) => {
+    const maxId = Math.max(...data.map((item) => item.id), 0);
+    return maxId + 1;
+  };
 
+  let modalDataCopy = modalData;
 
-
+  const handleSave = () => {
+    const newData = [...excelData];
+    if (modalDataCopy === null) {
+      const newId = generateUniqueId(newData);
+      modalDataCopy = { id: newId, len: formData.len, status: formData.status };
+      newData.push(modalDataCopy);
+    } else {
+      const index = newData.findIndex((item) => modalDataCopy.id === item.id);
+      newData[index] = modalDataCopy;
+    }
+    setExcelData(newData);
+    setIsModalVisible(false);
+  };
 
   const showAddModal = () => {
     setIsModalVisible(true);
@@ -210,7 +259,7 @@ const handleSave = () => {
       </Upload>
       {excelData.length > 0 && (
         <Button type="primary" onClick={showAddModal}>
-          Add New Data
+          New Add Data
         </Button>
       )}
       <Table
@@ -229,14 +278,14 @@ const handleSave = () => {
                         icon={<EditOutlined />}
                         onClick={handleSave}
                       >
-                        Save
+                        Kaydet
                       </Button>
                       <Button
                         type="default"
                         icon={<DeleteOutlined />}
                         onClick={() => setEditingKey("")}
                       >
-                        Cancel
+                        İptal
                       </Button>
                     </Space>
                   ) : (
@@ -248,16 +297,16 @@ const handleSave = () => {
                           setModalData(record);
                           setIsModalVisible(true);
                         }}
-                      >
-                      
-                      </Button>
+                      ></Button>
                       <Button
                         type="default"
                         icon={<DeleteOutlined />}
                         onClick={() => handleDelete(record)}
-                      >
-                  
-                      </Button>
+                      ></Button>
+                      <Button
+                        type="default"
+                        icon={<EnvironmentOutlined />}
+                      ></Button>
                     </Space>
                   )}
                 </div>
@@ -269,6 +318,22 @@ const handleSave = () => {
         pagination={true}
       />
 
+      <Button
+        type="default"
+        icon={<PieChartOutlined />}
+        onClick={showPieChart}
+      >
+        Analiz 1
+      </Button>
+      <Button
+        type="default"
+        icon={<BarChartOutlined />}
+        onClick={showBarChart}
+      >
+        Analiz 2
+      </Button>
+      {barChartData && <BarChart data={barChartData} />}
+      {pieChartData && <PieChart data={pieChartData} />}
       <AddEditModal
         isModalVisible={isModalVisible}
         handleSave={handleSave}
