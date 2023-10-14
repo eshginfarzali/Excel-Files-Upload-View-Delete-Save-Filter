@@ -67,10 +67,9 @@ export const ExcelTable = () => {
     const worksheet = workbook.Sheets[worksheetName];
     const data = XLSX.utils.sheet_to_json(worksheet);
 
-    // Mevcut en büyük id'yi bulun
+ 
     const maxId = Math.max(...excelData.map(item => item.id), 0);
 
-    // Yeni veriyi eklerken id'yi ayarlayın
     const newData = data.map((item, index) => ({
       ...item,
       id: maxId + 1 + index
@@ -164,7 +163,7 @@ export const ExcelTable = () => {
         }))
       : [];
 
-// ...
+
 const generateUniqueId = (data) => {
   const maxId = Math.max(...data.map(item => item.id), 0);
   return maxId + 1;
@@ -175,13 +174,11 @@ let modalDataCopy = modalData;
 const handleSave = () => {
   const newData = [...excelData];
   if (modalDataCopy === null) {
-    // If modalDataCopy is null, it means new data is being added.
-    // Generate a new unique ID for the new data.
+  
     const newId = generateUniqueId(newData);
     modalDataCopy = { id: newId, len: formData.len, status: formData.status };
     newData.push(modalDataCopy);
   } else {
-    // If modalDataCopy is not null, an existing data is being updated.
     const index = newData.findIndex((item) => modalDataCopy.id === item.id);
     newData[index] = modalDataCopy;
   }
