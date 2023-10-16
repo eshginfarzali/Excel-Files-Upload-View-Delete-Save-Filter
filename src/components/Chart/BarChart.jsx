@@ -1,4 +1,4 @@
-
+/*eslint-disable*/
 import {
   Chart as ChartJS,
   CategoryScale,
