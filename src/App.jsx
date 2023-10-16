@@ -1,16 +1,11 @@
-
-import { ExcelTable} from "./components"
-
+import { ExcelTable } from "./components";
 
 function App() {
-
   return (
     <>
-   
-    <ExcelTable/>
-   
+      <ExcelTable />
     </>
-  )
+  );
 }
 
-export default App
+export default App;

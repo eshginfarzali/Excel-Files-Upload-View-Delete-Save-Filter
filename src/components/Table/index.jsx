@@ -1,4 +1,4 @@
-import  { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { Upload, Button, Table, Input, Space, Alert, Row, Col } from "antd";
 import {
   UploadOutlined,
@@ -6,11 +6,14 @@ import {
   EditOutlined,
   DeleteOutlined,
   EnvironmentOutlined,
+  PieChartOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 import Highlighter from "react-highlight-words";
 import * as XLSX from "xlsx";
 import { AddEditModal } from "../Modal";
-import { MyMap } from "../Map"; 
+import { MyMap } from "../Map";
+import { BarChart, PieChart } from "../Chart";
 
 export const ExcelTable = () => {
   const [excelData, setExcelData] = useState([]);
@@ -23,23 +26,13 @@ export const ExcelTable = () => {
   const [formData, setFormData] = useState({ len: "", status: "" });
   const [, setExcelFile] = useState(null);
   const [typeError, setTypeError] = useState(null);
-  const [, setSelectedRowId] = useState(null);
-  const [wktData, setWktData] = useState(null); 
+  const [pieChartData, setPieChartData] = useState(null);
+  const [barChartData, setBarChartData] = useState(null);
+  const [selectedWkt, setSelectedWkt] = useState(null);
 
-  const handleEdit = (record) => {
-    setEditingKey(record.id);
-  };
-
-  const handleSave = (record) => {
-    const newData = [...excelData];
-    const index = newData.findIndex((item) => record.id === item.id);
-    if (index > -1) {
-      newData[index] = { ...record, ...formData };
-      setExcelData(newData);
-      setEditingKey("");
-    } else {
-      console.error("Record not found.");
-    }
+  const showOnMap = (wkt) => {
+    const updatedData = excelData.filter((item) => item.id === wkt.id);
+    setSelectedWkt(updatedData);
   };
   const handleDelete = (record) => {
     const updatedData = excelData.filter((item) => item.id !== record.id);
@@ -64,11 +57,11 @@ export const ExcelTable = () => {
           handleFileSubmit(e.target.result);
         };
       } else {
-        setTypeError("Please select only excel file types");
+        setTypeError("Please select Excel file types only.");
         setExcelFile(null);
       }
     } else {
-      setTypeError("Please select your file");
+      setTypeError("Select your file.");
     }
   };
 
@@ -88,13 +81,6 @@ export const ExcelTable = () => {
     setExcelData(newData);
   };
 
-  const handleShowOnMap = (rowId) => {
-    const selectedRow = excelData.find((row) => row.id === rowId);
-    const wktData = selectedRow && selectedRow.wkt;
-    setWktData(wktData); // Əlavə edilmiş wkt məlumatını təyin et
-    setSelectedRowId(rowId); // Seçilmiş sətrin id-sini təyin et
-  };
-
   const handleSearch = (selectedKeys, confirm, dataIndex) => {
     confirm();
     setSearchText(selectedKeys[0]);
@@ -107,13 +93,20 @@ export const ExcelTable = () => {
   };
 
   const getColumnSearchProps = (dataIndex) => ({
-    filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
+    filterDropdown: ({
+      setSelectedKeys,
+      selectedKeys,
+      confirm,
+      clearFilters,
+    }) => (
       <div style={{ padding: 8 }}>
         <Input
           ref={searchInput}
           placeholder={`Search ${dataIndex}`}
           value={selectedKeys[0]}
-          onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+          onChange={(e) =>
+            setSelectedKeys(e.target.value ? [e.target.value] : [])
+          }
           onPressEnter={() => handleSearch(selectedKeys, confirm, dataIndex)}
           style={{ marginBottom: 8, display: "block" }}
         />
@@ -173,84 +166,178 @@ export const ExcelTable = () => {
         }))
       : [];
 
+  const showPieChart = () => {
+    const status0Count = excelData.filter((item) => item.status === 0).length;
+    const status1Count = excelData.filter((item) => item.status === 1).length;
+    const status0and1Total = status0Count + status1Count;
+    const status0Interset = ((status0Count * 100) / status0and1Total).toFixed();
+    const status1Interset = ((status1Count * 100) / status0and1Total).toFixed();
+
+    const pieChartData = {
+      labels: [
+        `Status-0 (${status0Count} quantity, ${status0Interset}%)`,
+        `Status-1 (${status1Count} quantity, ${status1Interset}%)`,
+      ],
+      label: "# of Votes",
+      datasets: [
+        {
+          label: "Len Count",
+          data: [status0Count, status1Count],
+          backgroundColor: ["#FF5733", "#33FF57"],
+        },
+      ],
+    };
+    setPieChartData(pieChartData);
+  };
+
+  const showBarChart = () => {
+    const status0LenTotal = excelData.reduce(
+      (total, item) => (item.status === 0 ? total + item.len : total),
+      0
+    );
+    const status1LenTotal = excelData.reduce(
+      (total, item) => (item.status === 1 ? total + item.len : total),
+      0
+    );
+    const status2LenTotal = excelData.reduce(
+      (total, item) => (item.status === 2 ? total + item.len : total),
+      0
+    );
+    const labels = ["Satus 0", "Satus 1", "Satus 2"];
+    const barChartData = {
+      labels: labels,
+      datasets: [
+        {
+          label: "Total Dataset",
+          data: [status0LenTotal, status1LenTotal, status2LenTotal],
+
+          backgroundColor: ["#FF5733", "#33FF57", "#3366FF"],
+        },
+      ],
+    };
+    setBarChartData(barChartData);
+  };
+
+  const generateUniqueId = (data) => {
+    const maxId = Math.max(...data.map((item) => item.id), 0);
+    return maxId + 1;
+  };
+
+  let modalDataCopy = modalData;
+
+  const handleSave = () => {
+    const newData = [...excelData];
+    if (modalDataCopy === null) {
+      const newId = generateUniqueId(newData);
+      modalDataCopy = { id: newId, len: formData.len, status: formData.status };
+      newData.push(modalDataCopy);
+    } else {
+      const index = newData.findIndex((item) => modalDataCopy.id === item.id);
+      newData[index] = modalDataCopy;
+    }
+    setExcelData(newData);
+    setIsModalVisible(false);
+  };
+
+  const showAddModal = () => {
+    setIsModalVisible(true);
+    setModalData(null);
+  };
+
   return (
     <div>
-        <Row className="row">
-      <Col span={16}>
-      {typeError && <Alert message={typeError} type="error" showIcon />}
-      <Upload
-        name="file"
-        accept=".xlsx"
-        maxCount={1}
-        fileList={[]}
-        onChange={handleFile}
-        showUploadList={false}
-      >
-        <Button icon={<UploadOutlined/>}>Load Excel File</Button>
-      </Upload>
-      {excelData.length > 0 && (
-        <Button type="primary" onClick={() => setIsModalVisible(true)}>
-          New Add Data
-        </Button>
-      )}
-      <Table
-        columns={[
-          ...columns,
-          {
-            dataIndex: "actions",
-            render: (_, record) => {
-              const editable = record.id === editingKey;
-              return (
-                <div>
-                  {editable ? (
-                    <Space>
-                      <Button
-                        type="primary"
-                        icon={<EditOutlined />}
-                        onClick={() => handleSave(record)}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        type="default"
-                        icon={<DeleteOutlined />}
-                        onClick={() => setEditingKey("")}
-                      >
-                        Cancel
-                      </Button>
-                    </Space>
-                  ) : (
-                    <Space>
-                      <Button
-                        type="default"
-                        icon={<EditOutlined />}
-                        onClick={() => handleEdit(record)}
-                      />
-                      <Button
-                        type="default"
-                        icon={<DeleteOutlined />}
-                        onClick={() => handleDelete(record)}
-                      />
-                      <Button
-                        type="default"
-                        icon={<EnvironmentOutlined />}
-                        onClick={() => handleShowOnMap(record.id)}
-                      />
-                    </Space>
-                  )}
-                </div>
-              );
-            },
-          },
-        ]}
-        dataSource={excelData.map((item) => ({ ...item, key: item.id }))}
-        pagination={true}
-      />
-   
-      </Col>
+      <Row>
+        <Col span={16}>
+          {typeError && <Alert message={typeError} type="error" showIcon />}
+          <Upload
+            name="file"
+            accept=".xlsx"
+            maxCount={1}
+            fileList={[]}
+            onChange={handleFile}
+            showUploadList={false}
+          >
+            <Button icon={<UploadOutlined />}>Load Excel File</Button>
+          </Upload>
+          {excelData.length > 0 && (
+            <Button type="primary" onClick={showAddModal}>
+              New Add Data
+            </Button>
+          )}
+          <Table
+            columns={[
+              ...columns,
+              {
+                dataIndex: "actions",
+                render: (_, record) => {
+                  const editable = record.id === editingKey;
+                  return (
+                    <div>
+                      {editable ? (
+                        <Space>
+                          <Button
+                            type="primary"
+                            icon={<EditOutlined />}
+                            onClick={handleSave}
+                          >
+                            Kaydet
+                          </Button>
+                          <Button
+                            type="default"
+                            icon={<DeleteOutlined />}
+                            onClick={() => setEditingKey("")}
+                          >
+                            İptal
+                          </Button>
+                        </Space>
+                      ) : (
+                        <Space>
+                          <Button
+                            type="default"
+                            icon={<EditOutlined />}
+                            onClick={() => {
+                              setModalData(record);
+                              setIsModalVisible(true);
+                            }}
+                          />
+                          <Button
+                            type="default"
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDelete(record)}
+                          />
+                          <Button
+                            type="default"
+                            icon={<EnvironmentOutlined />}
+                            onClick={() => showOnMap(record.wkt)}
+                          />
+                        </Space>
+                      )}
+                    </div>
+                  );
+                },
+              },
+            ]}
+            dataSource={excelData.map((item) => ({ ...item, key: item.id }))}
+            pagination={true}
+          />
+        </Col>
+        <Col span={8}>
+          {" "}
+          <MyMap wktData={selectedWkt} />
+        </Col>
+      </Row>
 
-     <Col span={8}> <MyMap wktData={wktData} /></Col>
-     </Row>
+      <Button type="default" icon={<PieChartOutlined />} onClick={showPieChart}>
+        Analiz 1
+      </Button>
+      <Button type="default" icon={<BarChartOutlined />} onClick={showBarChart}>
+        Analiz 2
+      </Button>
+      <Row className="row">
+        {pieChartData && <PieChart data={pieChartData} />}
+        {barChartData && <BarChart data={barChartData} />}
+      </Row>
+
       <AddEditModal
         isModalVisible={isModalVisible}
         handleSave={handleSave}
