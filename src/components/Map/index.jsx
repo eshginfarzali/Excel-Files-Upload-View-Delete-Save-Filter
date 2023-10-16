@@ -1,37 +1,49 @@
-import * as ol from "ol";
+/*eslint-disable */
+import "ol/ol.css";
+import Map from "ol/Map";
+import View from "ol/View";
+import TileLayer from "ol/layer/Tile";
+import OSM from "ol/source/OSM";
+import VectorLayer from "ol/layer/Vector";
+import VectorSource from "ol/source/Vector";
+import { fromLonLat } from "ol/proj";
+
+import WKT from "ol/format/WKT";
 import { useEffect, useRef } from "react";
 
 export const MyMap = ({ wktData }) => {
   const mapContainer = useRef(null);
+  const vectorLayer = useRef(null); // Vektor mənbəsini təyin etmək üçün
 
   useEffect(() => {
-    // OpenLayers harita oluşturma
-    const map = new ol.MapBrowser({
+    const map = new Map({
       target: mapContainer.current,
       layers: [
-        new ol.layer.Tile({
-          source: new ol.source.OSM(),
+        new TileLayer({
+          source: new OSM(),
+        }),
+        // Xəritə üçün yeni vektor mənbəsi
+        new VectorLayer({
+          source: new VectorSource(),
         }),
       ],
-      view: new ol.View({
-        center: [0, 0],
-        zoom: 2,
+      view: new View({
+        center: fromLonLat([50.32500619720577, 40.39007045577375]),
+        zoom: 12,
       }),
     });
 
-    // WKT formatını okuma ve geometri oluşturma
-    const format = new ol.format.WKT();
-    const features = wktData.map((wkt) => format.readFeature(wkt));
-
-    // Vektör katmanı oluşturma
-    const vectorLayer = new ol.layer.Vector({
-      source: new ol.source.Vector({
-        features: features,
-      }),
-    });
-
-    map.addLayer(vectorLayer);
+    if (wktData) {
+      // Əgər wktData mövcuddursa, yeni məlumat əlavə et
+      const format = new WKT();
+      const feature = format.readFeature(wktData);
+      vectorLayer.current = map.getLayers().getArray()[1];
+      vectorLayer.current.getSource().clear(); // Əvvəlcədən mövcud məlumatı təmizlə
+      vectorLayer.current.getSource().addFeature(feature);
+    }
   }, [wktData]);
 
-  return <div ref={mapContainer} style={{ height: "400px" }}></div>;
+  return (
+    <div ref={mapContainer} style={{ height: "400px" }}></div>
+  );
 };

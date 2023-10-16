@@ -1,43 +1,265 @@
-import * as ol from "ol";
-import { useEffect, useRef } from "react";
+import  { useState, useRef } from "react";
+import { Upload, Button, Table, Input, Space, Alert, Row, Col } from "antd";
+import {
+  UploadOutlined,
+  SearchOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EnvironmentOutlined,
+} from "@ant-design/icons";
+import Highlighter from "react-highlight-words";
+import * as XLSX from "xlsx";
+import { AddEditModal } from "../Modal";
+import { MyMap } from "../Map"; 
 
-export const MyMap = ({ wktData }) => {
-  const mapContainer = useRef(null);
+export const ExcelTable = () => {
+  const [excelData, setExcelData] = useState([]);
+  const [searchText, setSearchText] = useState("");
+  const [searchedColumn, setSearchedColumn] = useState("");
+  const searchInput = useRef();
+  const [editingKey, setEditingKey] = useState("");
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalData, setModalData] = useState(null);
+  const [formData, setFormData] = useState({ len: "", status: "" });
+  const [, setExcelFile] = useState(null);
+  const [typeError, setTypeError] = useState(null);
+  const [, setSelectedRowId] = useState(null);
+  const [wktData, setWktData] = useState(null); 
 
-  useEffect(() => {
-    // OpenLayers harita oluşturma
-    const map = new ol.Map({
-      target: mapContainer.current,
-      layers: [
-        new ol.layer.Tile({
-          source: new ol.source.OSM(),
-        }),
-      ],
-      view: new ol.View({
-        center: [0, 0],
-        zoom: 2,
-      }),
-    });
+  const handleEdit = (record) => {
+    setEditingKey(record.id);
+  };
 
-    // WKT formatını okuma ve geometri oluşturma
-    const format = new ol.format.WKT();
-    const features = wktData.map((wkt) => format.readFeature(wkt));
+  const handleSave = (record) => {
+    const newData = [...excelData];
+    const index = newData.findIndex((item) => record.id === item.id);
+    if (index > -1) {
+      newData[index] = { ...record, ...formData };
+      setExcelData(newData);
+      setEditingKey("");
+    } else {
+      console.error("Record not found.");
+    }
+  };
+  const handleDelete = (record) => {
+    const updatedData = excelData.filter((item) => item.id !== record.id);
+    setExcelData(updatedData);
+  };
 
-    // Vektör katmanı oluşturma
-    const vectorLayer = new ol.layer.Vector({
-      source: new ol.source.Vector({
-        features: features,
-      }),
-    });
+  const handleFile = (e) => {
+    let fileTypes = [
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/csv",
+    ];
+    let selectedFile = e.fileList[0]?.originFileObj;
 
-    // Katmanı haritaya ekleme
-    map.addLayer(vectorLayer);
+    if (selectedFile) {
+      if (selectedFile && fileTypes.includes(selectedFile.type)) {
+        setTypeError(null);
+        let reader = new FileReader();
+        reader.readAsArrayBuffer(selectedFile);
+        reader.onload = (e) => {
+          setExcelFile(e.target.result);
+          handleFileSubmit(e.target.result);
+        };
+      } else {
+        setTypeError("Please select only excel file types");
+        setExcelFile(null);
+      }
+    } else {
+      setTypeError("Please select your file");
+    }
+  };
 
-    return () => {
-      // Haritayı temizleme
-      map.dispose();
-    };
-  }, [wktData]);
+  const handleFileSubmit = (fileData) => {
+    const workbook = XLSX.read(fileData, { type: "buffer" });
+    const worksheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[worksheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet);
 
-  return <div ref={mapContainer} style={{ height: "400px" }}></div>;
+    const maxId = Math.max(...excelData.map((item) => item.id), 0);
+
+    const newData = data.map((item, index) => ({
+      ...item,
+      id: maxId + 1 + index,
+    }));
+
+    setExcelData(newData);
+  };
+
+  const handleShowOnMap = (rowId) => {
+    const selectedRow = excelData.find((row) => row.id === rowId);
+    const wktData = selectedRow && selectedRow.wkt;
+    setWktData(wktData); // Əlavə edilmiş wkt məlumatını təyin et
+    setSelectedRowId(rowId); // Seçilmiş sətrin id-sini təyin et
+  };
+
+  const handleSearch = (selectedKeys, confirm, dataIndex) => {
+    confirm();
+    setSearchText(selectedKeys[0]);
+    setSearchedColumn(dataIndex);
+  };
+
+  const handleReset = (clearFilters) => {
+    clearFilters();
+    setSearchText("");
+  };
+
+  const getColumnSearchProps = (dataIndex) => ({
+    filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
+      <div style={{ padding: 8 }}>
+        <Input
+          ref={searchInput}
+          placeholder={`Search ${dataIndex}`}
+          value={selectedKeys[0]}
+          onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+          onPressEnter={() => handleSearch(selectedKeys, confirm, dataIndex)}
+          style={{ marginBottom: 8, display: "block" }}
+        />
+        <Space>
+          <Button
+            type="primary"
+            onClick={() => handleSearch(selectedKeys, confirm, dataIndex)}
+            icon={<SearchOutlined />}
+            size="small"
+            style={{ width: 90 }}
+          >
+            Search
+          </Button>
+          <Button
+            onClick={() => clearFilters && handleReset(clearFilters)}
+            size="small"
+            style={{ width: 90 }}
+          >
+            Reset
+          </Button>
+        </Space>
+      </div>
+    ),
+    filterIcon: (filtered) => (
+      <SearchOutlined style={{ color: filtered ? "#1890ff" : undefined }} />
+    ),
+    onFilter: (value, record) =>
+      record[dataIndex] &&
+      record[dataIndex].toString().toLowerCase().includes(value.toLowerCase()),
+    onFilterDropdownVisibleChange: (visible) => {
+      if (visible) {
+        setTimeout(() => searchInput.current.select(), 100);
+      }
+    },
+    render: (text) =>
+      searchedColumn === dataIndex ? (
+        <Highlighter
+          highlightStyle={{ backgroundColor: "#ffc069", padding: 0 }}
+          searchWords={[searchText]}
+          autoEscape
+          textToHighlight={text ? text.toString() : ""}
+        />
+      ) : (
+        text
+      ),
+  });
+
+  const columns =
+    excelData.length > 0
+      ? Object.keys(excelData[0]).map((key) => ({
+          title: key,
+          dataIndex: key,
+          key: key,
+          width: "20%",
+          ...getColumnSearchProps(key),
+          sorter: (a, b) => (a[key] > b[key] ? 1 : -1),
+        }))
+      : [];
+
+  return (
+    <div>
+        <Row className="row">
+      <Col span={16}>
+      {typeError && <Alert message={typeError} type="error" showIcon />}
+      <Upload
+        name="file"
+        accept=".xlsx"
+        maxCount={1}
+        fileList={[]}
+        onChange={handleFile}
+        showUploadList={false}
+      >
+        <Button icon={<UploadOutlined/>}>Load Excel File</Button>
+      </Upload>
+      {excelData.length > 0 && (
+        <Button type="primary" onClick={() => setIsModalVisible(true)}>
+          New Add Data
+        </Button>
+      )}
+      <Table
+        columns={[
+          ...columns,
+          {
+            dataIndex: "actions",
+            render: (_, record) => {
+              const editable = record.id === editingKey;
+              return (
+                <div>
+                  {editable ? (
+                    <Space>
+                      <Button
+                        type="primary"
+                        icon={<EditOutlined />}
+                        onClick={() => handleSave(record)}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        type="default"
+                        icon={<DeleteOutlined />}
+                        onClick={() => setEditingKey("")}
+                      >
+                        Cancel
+                      </Button>
+                    </Space>
+                  ) : (
+                    <Space>
+                      <Button
+                        type="default"
+                        icon={<EditOutlined />}
+                        onClick={() => handleEdit(record)}
+                      />
+                      <Button
+                        type="default"
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleDelete(record)}
+                      />
+                      <Button
+                        type="default"
+                        icon={<EnvironmentOutlined />}
+                        onClick={() => handleShowOnMap(record.id)}
+                      />
+                    </Space>
+                  )}
+                </div>
+              );
+            },
+          },
+        ]}
+        dataSource={excelData.map((item) => ({ ...item, key: item.id }))}
+        pagination={true}
+      />
+   
+      </Col>
+
+     <Col span={8}> <MyMap wktData={wktData} /></Col>
+     </Row>
+      <AddEditModal
+        isModalVisible={isModalVisible}
+        handleSave={handleSave}
+        handleCancel={() => setIsModalVisible(false)}
+        modalData={modalData}
+        setModalData={setModalData}
+        formData={formData}
+        setFormData={setFormData}
+      />
+    </div>
+  );
 };
