@@ -9,6 +9,9 @@ import {
   PieChartOutlined,
   BarChartOutlined,
 } from "@ant-design/icons";
+import swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
+
 import Highlighter from "react-highlight-words";
 import * as XLSX from "xlsx";
 import { AddEditModal } from "../Modal";
@@ -35,9 +38,26 @@ export const ExcelTable = () => {
     setSelectedWkt(updatedData);
   };
   const handleDelete = (record) => {
-    const updatedData = excelData.filter((item) => item.id !== record.id);
-    setExcelData(updatedData);
+    swal
+      .fire({
+        title: 'Are you sure?',
+        text: 'You are about to delete this record. This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#d33',
+      })
+      .then((result) => {
+        if (result.isConfirmed) {
+         
+          const updatedData = excelData.filter((item) => item.id !== record.id);
+          setExcelData(updatedData);
+          swal.fire('Deleted!', 'The record has been deleted.', 'success');
+        }
+      });
   };
+  
 
   const handleFile = (e) => {
     let fileTypes = [
@@ -317,7 +337,7 @@ export const ExcelTable = () => {
                 },
               },
             ]}
-            dataSource={excelData.map((item) => ({ ...item, key: item.id }))}
+            dataSource={excelData.reverse().map((item) => ({ ...item, key: item.id }))}
             pagination={true}
           />
         </Col>
